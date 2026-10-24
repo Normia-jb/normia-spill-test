@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kunnskapsbygget – v5</title>
+<style>
+  :root {
+    --bg: #0b1220;
+    --surface: #151c2c;
+    --surface-2: #1e293b;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --border: #2a3545;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #sidebar {
+    width: 280px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 16px 0;
+  }
+  #sidebar h2 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 0 16px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tree-item {
+    padding: 7px 16px 7px 28px;
+    cursor: pointer;
+    font-size: 0.92rem;
+    border-left: 3px solid transparent;
+  }
+  .tree-item:hover { background: var(--surface-2); }
+  .tree-item.active { background: #1e3a5f; border-left-color: var(--accent); }
+  .tree-item.folder { font-weight: 600; padding-left: 16px; }
+  .tree-item.child { padding-left: 36px; color: var(--muted); }
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  #header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  #header h1 { font-size: 1.35rem; font-weight: 600; }
+  #header .path { color: var(--muted); font-size: 0.82rem; margin-top: 2px; }
+  #content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+  #chatbar {
+    border-top: 1px solid var(--border);
+    padding: 12px 24px;
+    background: var(--surface);
+    display: flex;
+    gap: 8px;
+  }
+  #chatInput {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 0.95rem;
+  }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  button:hover { opacity: 0.92; }
+  button.secondary { background: var(--surface-2); color: var(--text); }
+  button.selected { background: #1d4ed8; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .status-GRØNN { background: #14532d; color: var(--green); }
+  .status-GUL { background: #713f12; color: var(--yellow); }
+  .status-RØD { background: #7f1d1d; color: var(--red); }
+  .k-card { border-left: 4px solid var(--border); }
+  .k-card.fakta { border-left-color: var(--green); }
+  .k-card.antakelse { border-left-color: var(--yellow); }
+  .k-card.hull { border-left-color: var(--red); }
+  .event {
+    border-left: 3px solid var(--accent);
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    background: var(--surface);
+    border-radius: 0 8px 8px 0;
+    font-size: 0.88rem;
+  }
+  .event .time { color: var(--muted); font-size: 0.75rem; }
+  #activity {
+    width: 320px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 16px;
+  }
+  #activity h2 {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    letter-spacing: 0.03em;
+  }
+  #normiaFab {
+    position: fixed; bottom: 24px; right: 348px; width: 52px; height: 52px;
+    border-radius: 50%; background: var(--accent); color: white;
+    font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.35); z-index: 100;
+  }
+  #normiaBox {
+    position: fixed; bottom: 88px; right: 348px; width: 340px; height: 400px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    display: none; flex-direction: column; box-shadow: 0 8px 28px rgba(0,0,0,0.45); z-index: 100;
+  }
+  #normiaBox.open { display: flex; }
+  #normiaHeader {
+    padding: 12px 14px; border-bottom: 1px solid var(--border); font-weight: 600;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #normiaMessages { flex: 1; overflow-y: auto; padding: 12px; font-size: 0.9rem; }
+  .n-msg { margin-bottom: 8px; padding: 8px 10px; border-radius: 8px; }
+  .n-msg.user { background: #1e3a5f; margin-left: 20px; }
+  .n-msg.ai { background: var(--surface-2); margin-right: 20px; }
+  #normiaInputBar { padding: 10px; border-top: 1px solid var(--border); display: flex; gap: 6px; }
+  #normiaInput { flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 8px 10px; }
+</style>
+</head>
+<body>
+  <div id="sidebar">
+    <h2>Kunnskapsbygget</h2>
+    <div id="tree"></div>
+  </div>
+
+  <div id="main">
+    <div id="header">
+      <h1 id="title">Oversikt</h1>
+      <div class="path" id="path">00_Oversikt</div>
+    </div>
+    <div id="content"></div>
+    <div id="chatbar">
+      <input id="chatInput" type="text" placeholder="Spør om noe i kunnskapsbygget..." onkeypress="if(event.key==='Enter')sendChat()">
+      <button onclick="sendChat()">Send</button>
+    </div>
+  </div>
+
+  <div id="activity">
+    <h2>Hendelseslogg</h2>
+    <div id="eventLog"></div>
+  </div>
+
+  <div id="normiaFab" onclick="toggleNormia()">N</div>
+  <div id="normiaBox">
+    <div id="normiaHeader">
+      NORMIA AI
+      <span onclick="toggleNormia()" style="cursor:pointer;">✕</span>
+    </div>
+    <div id="normiaMessages">
+      <div class="n-msg ai">Hei. Jeg kan hjelpe med status, kort og eier. Hva lurer du på?</div>
+    </div>
+    <div id="normiaInputBar">
+      <input id="normiaInput" placeholder="Spør NORMIA AI..." onkeypress="if(event.key==='Enter')askNormia()">
+      <button onclick="askNormia()">Spør</button>
+    </div>
+  </div>
+
+<script>
+const structure = [
+  { id: "oversikt", name: "00_Oversikt", children: [{ id: "status", name: "status.html" }] },
+  { id: "prosjekt", name: "01_Prosjekt", children: [
+    { id: "vertical", name: "vertical-slice", children: [
+      { id: "kunnskap", name: "kunnskapskort.html" },
+      { id: "oppgaver", name: "oppgaver.html" },
+      { id: "dokumentasjon", name: "dokumentasjon.html" }
+    ]}
+  ]},
+  { id: "roller", name: "02_Roller", children: [
+    { id: "ag002", name: "AG-002" },
+    { id: "ag003", name: "AG-003" }
+  ]},
+  { id: "aktivitet", name: "03_Aktivitet", children: [{ id: "logg", name: "hendelseslogg.html" }] }
+];
+
+let cards = [
+  { id: 1, title: "Android-build feiler", content: "Build feiler på Android. OutOfMemoryError. Tre enheter.", source: "Utvikler + logg", type: null, linked: false, owner: false, critical: true },
+  { id: 2, title: "Kanskje minne?", content: "Tror det kan være minnet. Ikke undersøkt.", source: "Samme utvikler", type: null, linked: false, owner: false, critical: false },
+  { id: 3, title: "Art rekker ikke", content: "Art-teamet rekker ikke tre nye karakterer.", source: "Art lead", type: null, linked: false, owner: false, critical: true },
+  { id: 4, title: "Tutorial for lang", content: "Spilltestere: tutorial for lang. 3/5 ga opp.", source: "Spilltest", type: null, linked: false, owner: false, critical: false },
+  { id: 5, title: "Publisher vil ha multiplayer", content: "Publisher vil ha multiplayer i vertical slice.", source: "Produsent, muntlig", type: null, linked: false, owner: false, critical: true },
+  { id: 6, title: "Noen fikset det?", content: "Hørte at noen fikset Android-problemet i går.", source: "Kantina, ubekreftet", type: null, linked: false, owner: false, critical: false },
+  { id: 7, title: "Mangler lydlisens", content: "Mangler fortsatt lisens på lydbibliotek i menyen.", source: "Produsent, e-post", type: null, linked: false, owner: false, critical: true }
+];
+
+const events = [];
+function saveState() {
+  localStorage.setItem("kb_cards_v5", JSON.stringify(cards));
+  localStorage.setItem("kb_events_v5", JSON.stringify(events));
+}
+function loadState() {
+  try {
+    const c = localStorage.getItem("kb_cards_v5");
+    const e = localStorage.getItem("kb_events_v5");
+    if (c) cards = JSON.parse(c);
+    if (e) events.push(...JSON.parse(e));
+  } catch {}
+}
+loadState();
+
+function addEvent(text) {
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,"0") + ":" + now.getMinutes().toString().padStart(2,"0");
+  events.unshift({ time, text });
+  if (events.length > 40) events.pop();
+  renderEvents();
+  saveState();
+}
+addEvent("v5 startet");
+
+function getStatus() {
+  const open = cards.filter(c => c.critical && !(c.type && c.linked && c.owner)).length;
+  if (open === 0) return "GRØNN";
+  if (open >= 2) return "RØD";
+  return "GUL";
+}
+
+const pages = {
+  status: {
+    title: "Oversikt",
+    path: "00_Oversikt / status.html",
+    render: () => {
+      const s = getStatus();
+      const open = cards.filter(c => c.critical && !(c.type && c.linked && c.owner)).length;
+      return `<div class="card">
+        <div class="status-badge status-${s}">● ${s}</div>
+        <h3 style="margin-top:10px;">Prosjektstatus</h3>
+        <p style="color:var(--muted);margin-top:6px;">${open} kritiske kort uten full behandling.</p>
+      </div>`;
+    }
+  },
+  kunnskap: {
+    title: "Kunnskapskort",
+    path: "01_Prosjekt / vertical-slice / kunnskapskort.html",
+    render: () => cards.map(c => `
+      <div class="card k-card ${c.type ? c.type.toLowerCase() : ''}">
+        <h3>${c.title}</h3>
+        <p style="margin:6px 0;font-size:0.92rem;">${c.content}</p>
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px;">${c.source}</div>
+        <div>
+          <button class="${c.type==='Fakta'?'selected':''}" onclick="setType(${c.id},'Fakta')">Fakta</button>
+          <button class="${c.type==='Antakelse'?'selected':''}" onclick="setType(${c.id},'Antakelse')">Antakelse</button>
+          <button class="${c.type==='Hull'?'selected':''}" onclick="setType(${c.id},'Hull')">Hull</button>
+          <button class="secondary ${c.linked?'selected':''}" onclick="toggleLink(${c.id})">Koble</button>
+          <button class="secondary ${c.owner?'selected':''}" onclick="toggleOwner(${c.id})">Eier</button>
+        </div>
+      </div>
+    `).join("")
+  },
+  oppgaver: {
+    title: "Oppgaver",
+    path: "01_Prosjekt / vertical-slice / oppgaver.html",
+    render: () => {
+      const open = cards.filter(c => c.critical && !(c.type && c.linked && c.owner));
+      return `<div class="card"><h3>Åpne kritiske</h3>${open.length ? open.map(c => `<p style="margin:6px 0;">• ${c.title}</p>`).join("") : "<p>Ingen åpne kritiske.</p>"}</div>`;
+    }
+  },
+  dokumentasjon: { title: "Dokumentasjon", path: "01_Prosjekt / vertical-slice / dokumentasjon.html", render: () => `<div class="card"><h3>Dokumentasjon</h3><ul style="margin:10px 0 0 18px;color:var(--muted);"><li>Build-logg</li><li>Spilltest</li><li>Publisher-referat</li></ul></div>` },
+  ag002: { title: "AG-002", path: "02_Roller / AG-002", render: () => `<div class="card"><h3>AG-002</h3><p>Prosjektkontroll</p></div>` },
+  ag003: { title: "AG-003", path: "02_Roller / AG-003", render: () => `<div class="card"><h3>AG-003</h3><p>Dokumentasjon & evidens</p></div>` },
+  logg: { title: "Hendelseslogg", path: "03_Aktivitet / hendelseslogg.html", render: () => `<div class="card"><h3>Samlet logg</h3><p>Se høyre panel.</p></div>` }
+};
+
+function renderTree() {
+  const tree = document.getElementById("tree");
+  tree.innerHTML = "";
+  structure.forEach(folder => {
+    const f = document.createElement("div");
+    f.className = "tree-item folder";
+    f.textContent = folder.name;
+    f.onclick = () => selectPage(folder.children?.[0]?.id || "status");
+    tree.appendChild(f);
+    (folder.children || []).forEach(child => {
+      const c = document.createElement("div");
+      c.className = "tree-item child";
+      c.textContent = child.name;
+      c.onclick = () => selectPage(child.id);
+      tree.appendChild(c);
+      if (child.children) {
+        child.children.forEach(sub => {
+          const s = document.createElement("div");
+          s.className = "tree-item child";
+          s.style.paddingLeft = "48px";
+          s.textContent = sub.name;
+          s.onclick = () => selectPage(sub.id);
+          tree.appendChild(s);
+        });
+      }
+    });
+  });
+}
+
+function selectPage(id) {
+  const page = pages[id] || pages.status;
+  document.getElementById("title").textContent = page.title;
+  document.getElementById("path").textContent = page.path;
+  document.getElementById("content").innerHTML = page.render();
+  document.querySelectorAll(".tree-item").forEach(el => el.classList.remove("active"));
+  event?.target?.classList?.add("active");
+}
+
+function renderEvents() {
+  document.getElementById("eventLog").innerHTML = events.map(e =>
+    `<div class="event"><div class="time">${e.time}</div>${e.text}</div>`
+  ).join("");
+}
+
+function setType(id, type) { const c = cards.find(x => x.id === id); c.type = c.type === type ? null : type; addEvent(`${c.title} → ${type}`); selectPage("kunnskap"); }
+function toggleLink(id) { const c = cards.find(x => x.id === id); c.linked = !c.linked; addEvent(`${c.title} ${c.linked ? "koblet" : "kobling fjernet"}`); selectPage("kunnskap"); }
+function toggleOwner(id) { const c = cards.find(x => x.id === id); c.owner = !c.owner; addEvent(`${c.title} ${c.owner ? "fikk eier" : "eier fjernet"}`); selectPage("kunnskap"); }
+
+function sendChat() {
+  const input = document.getElementById("chatInput");
+  const text = input.value.trim();
+  if (!text) return;
+  addEvent("Samhandling: " + text);
+  input.value = "";
+  const content = document.getElementById("content");
+  const msg = document.createElement("div");
+  msg.className = "card";
+  msg.innerHTML = `<strong>Du:</strong> ${text}<div style="font-size:0.75rem;color:var(--muted);margin-top:4px;">akkurat nå</div>`;
+  content.prepend(msg);
+}
+
+function toggleNormia() { document.getElementById("normiaBox").classList.toggle("open"); }
+
+function askNormia() {
+  const input = document.getElementById("normiaInput");
+  const q = input.value.trim();
+  if (!q) return;
+  const messages = document.getElementById("normiaMessages");
+  messages.innerHTML += `<div class="n-msg user">${q}</div>`;
+  input.value = "";
+  const s = getStatus();
+  const open = cards.filter(c => c.critical && !(c.type && c.linked && c.owner));
+  let answer = "Jeg ser på status og kortene nå.";
+  const lower = q.toLowerCase();
+  if (lower.includes("status")) answer = `Nåværende status er ${s}. ${open.length} kritiske kort mangler full behandling.`;
+  else if (lower.includes("android") || lower.includes("build")) answer = "Android-build er kritisk. Den mangler fortsatt type + kobling + eier.";
+  else if (lower.includes("eier") || lower.includes("hvem")) answer = "Kritiske uten eier: " + (open.map(c => c.title).join(", ") || "ingen");
+  else if (lower.includes("hva") || lower.includes("nå")) answer = `Status ${s}. Åpne kritiske: ${open.length}.`;
+  else answer = "Jeg kan hjelpe med status, åpne kort og eier. Prøv å spørre om status eller Android.";
+  setTimeout(() => {
+    messages.innerHTML += `<div class="n-msg ai">${answer}</div>`;
+    messages.scrollTop = messages.scrollHeight;
+  }, 300);
+  messages.scrollTop = messages.scrollHeight;
+  addEvent("NORMIA AI: spørsmål");
+}
+
+renderTree();
+renderEvents();
+selectPage("status");
+</script>
+</body>
+</html>
