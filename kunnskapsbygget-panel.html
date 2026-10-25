@@ -93,6 +93,7 @@
   }
   button:hover { background: #374151; }
   button.selected { background: var(--accent); color: white; border-color: var(--accent); }
+  button.primary { background: var(--accent); color: white; border: none; }
   #aiBar {
     border-top: 1px solid var(--border);
     padding: 12px 24px;
@@ -100,7 +101,7 @@
     display: flex;
     gap: 8px;
   }
-  #aiInput {
+  #aiInput, input, textarea {
     flex: 1;
     background: var(--surface-2);
     border: 1px solid var(--border);
@@ -108,6 +109,7 @@
     color: var(--text);
     padding: 10px 12px;
     font-size: 0.9rem;
+    font-family: inherit;
   }
   #aiBar button { background: var(--accent); color: white; border: none; }
   #activity {
@@ -127,6 +129,8 @@
     margin-bottom: 12px;
     font-size: 0.88rem;
   }
+  .add-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .add-form input, .add-form textarea { width: 100%; }
 </style>
 </head>
 <body>
@@ -212,6 +216,7 @@ function renderContent() {
       <div class="k-card">
         <h3>Status: ${s}</h3>
         <p>${open.length} kritiske kort uten full behandling.</p>
+        <p style="margin-top:8px;color:var(--muted);font-size:0.85rem;">Totalt ${cards.length} kort.</p>
       </div>
     `;
     return;
@@ -246,7 +251,22 @@ function renderContent() {
     ? cards.filter(c => (c.title + " " + c.content + " " + c.source).toLowerCase().includes(filter.toLowerCase()))
     : cards;
 
-  document.getElementById("content").innerHTML = visible.map(c => `
+  const addForm = `
+    <div class="k-card">
+      <h3 style="margin-bottom:10px;">Nytt kunnskapskort</h3>
+      <div class="add-form">
+        <input id="newTitle" placeholder="Tittel">
+        <textarea id="newContent" rows="2" placeholder="Innhold"></textarea>
+        <input id="newSource" placeholder="Kilde">
+        <div>
+          <button class="primary" onclick="addCard()">Legg til</button>
+          <button onclick="clearFilter()">Nullstill søk</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("content").innerHTML = addForm + (visible.map(c => `
     <div class="k-card ${c.type ? c.type.toLowerCase() : ''}">
       <h3>${c.type ? c.type + " · " : ""}${c.title}</h3>
       <p>${c.content}</p>
@@ -255,17 +275,45 @@ function renderContent() {
         <button class="${c.type==='Fakta'?'selected':''}" onclick="setType(${c.id},'Fakta')">Fakta</button>
         <button class="${c.type==='Antakelse'?'selected':''}" onclick="setType(${c.id},'Antakelse')">Antakelse</button>
         <button class="${c.type==='Hull'?'selected':''}" onclick="setType(${c.id},'Hull')">Hull</button>
-        <button class="secondary ${c.linked?'selected':''}" onclick="toggle(${c.id},'linked')">Koble</button>
-        <button class="secondary ${c.owner?'selected':''}" onclick="toggle(${c.id},'owner')">Eier</button>
+        <button class="${c.linked?'selected':''}" onclick="toggle(${c.id},'linked')">Koble</button>
+        <button class="${c.owner?'selected':''}" onclick="toggle(${c.id},'owner')">Eier</button>
+        <button onclick="removeCard(${c.id})">Slett</button>
       </div>
     </div>
-  `).join("") || `<div class="k-card">Ingen treff på «${filter}»</div>`;
+  `).join("") || `<div class="k-card">Ingen treff på «${filter}»</div>`);
 }
 
 function renderEvents() {
   document.getElementById("eventLog").innerHTML = events.slice(0, 20).map(e =>
     `<div class="event"><div class="time">${e.time}</div>${e.text}</div>`
   ).join("");
+}
+
+function addCard() {
+  const title = document.getElementById("newTitle").value.trim();
+  const content = document.getElementById("newContent").value.trim();
+  const source = document.getElementById("newSource").value.trim() || "Manuelt";
+  if (!title) return;
+  const id = Date.now();
+  cards.unshift({ id, title, content, source, type: null, linked: false, owner: false, critical: false });
+  events.unshift({ time: "nå", text: "Nytt kort: " + title });
+  saveState();
+  renderContent();
+  renderEvents();
+}
+
+function removeCard(id) {
+  const c = cards.find(x => x.id === id);
+  cards = cards.filter(x => x.id !== id);
+  events.unshift({ time: "nå", text: "Slettet: " + (c?.title || id) });
+  saveState();
+  renderContent();
+  renderEvents();
+}
+
+function clearFilter() {
+  filter = "";
+  renderContent();
 }
 
 function setType(id, type) {
@@ -317,7 +365,7 @@ function handleAI() {
   if (lower.includes("status")) answer = `Status er ${s}. ${open.length} kritiske kort mangler full behandling.`;
   else if (lower.includes("android") || lower.includes("build")) answer = "Android-build er merket som Hull og er kritisk.";
   else if (lower.includes("eier") || lower.includes("hvem")) answer = "Åpne kritiske: " + (open.map(c => c.title).join(", ") || "ingen");
-  else if (lower.includes("hva") || lower.includes("nå")) answer = `Status ${s}. Åpne kritiske: ${open.length}.`;
+  else if (lower.includes("hva") || lower.includes("nå")) answer = `Status ${s}. Åpne kritiske: ${open.length}. Totalt ${cards.length} kort.`;
   else answer = "Jeg kan hjelpe med status, kort og søk. Prøv «søk android» eller «status».";
 
   document.getElementById("content").insertAdjacentHTML("afterbegin", `<div class="ai-reply"><strong>NORMIA AI:</strong> ${answer}</div>`);
