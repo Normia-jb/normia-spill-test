@@ -1,0 +1,22 @@
+{
+  "name": "kunnskapsbygget",
+  "version": "1.0.0",
+  "description": "Kunnskapsbygget – NORMIA AI panel",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "no.normia.kunnskapsbygget",
+    "productName": "Kunnskapsbygget",
+    "win": {
+      "target": "nsis",
+      "icon": "icon-512.png"
+    }
+  }
+}
