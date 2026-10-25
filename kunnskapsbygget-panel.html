@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kunnskapsbygget – Panel</title>
+<title>Kunnskapsbygget</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111827">
 <style>
   :root {
     --bg: #0b1220;
@@ -139,11 +141,11 @@
   <div id="main">
     <div id="topbar">
       <div><span class="status-pill" id="statusPill">● GUL</span></div>
-      <div style="font-size:0.8rem;color:var(--muted);">Sist oppdatert: akkurat nå</div>
+      <div style="font-size:0.8rem;color:var(--muted);" id="updated">Sist oppdatert: —</div>
     </div>
     <div id="content"></div>
     <div id="aiBar">
-      <input id="aiInput" placeholder="Spør NORMIA AI eller søk i kunnskap..." onkeypress="if(event.key==='Enter')handleAI()">
+      <input id="aiInput" placeholder="Spør NORMIA AI eller søk..." onkeypress="if(event.key==='Enter')handleAI()">
       <button onclick="handleAI()">Send</button>
     </div>
   </div>
@@ -154,19 +156,36 @@
   </div>
 
 <script>
-let cards = [
+const KEY = "kb_panel_v1";
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function saveState() {
+  localStorage.setItem(KEY, JSON.stringify({ cards, events, lastUpdate: new Date().toISOString() }));
+}
+
+const initialCards = [
   { id: 1, title: "Android-build feiler", content: "Build feiler på Android. OutOfMemoryError. Tre enheter.", source: "Utvikler + logg", type: "Hull", linked: false, owner: false, critical: true },
   { id: 2, title: "Kanskje minne?", content: "Tror det kan være minnet. Ikke undersøkt.", source: "Samme utvikler", type: "Antakelse", linked: false, owner: false, critical: false },
   { id: 3, title: "Art rekker ikke", content: "Art-teamet rekker ikke tre nye karakterer.", source: "Art lead", type: null, linked: false, owner: false, critical: true },
   { id: 4, title: "Tutorial for lang", content: "Spilltestere: tutorial for lang. 3/5 ga opp.", source: "Spilltest", type: "Fakta", linked: true, owner: false, critical: false }
 ];
 
-const events = [
+let state = loadState();
+let cards = state?.cards || initialCards;
+let events = state?.events || [
   { time: "10:21", text: "Ny kilde analysert" },
   { time: "10:18", text: "Antakelse oppdatert" }
 ];
 
 let filter = "";
+let currentPage = "kunnskap";
 
 function getStatus() {
   const open = cards.filter(c => c.critical && !(c.type && c.linked && c.owner)).length;
@@ -175,13 +194,56 @@ function getStatus() {
   return "GUL";
 }
 
+function updateTimestamp() {
+  const el = document.getElementById("updated");
+  const now = new Date();
+  el.textContent = "Sist oppdatert: " + now.getHours().toString().padStart(2,"0") + ":" + now.getMinutes().toString().padStart(2,"0");
+}
+
 function renderContent() {
   const s = getStatus();
   document.getElementById("statusPill").textContent = "● " + s;
   document.getElementById("statusPill").className = "status-pill " + s;
+  updateTimestamp();
+
+  if (currentPage === "status") {
+    const open = cards.filter(c => c.critical && !(c.type && c.linked && c.owner));
+    document.getElementById("content").innerHTML = `
+      <div class="k-card">
+        <h3>Status: ${s}</h3>
+        <p>${open.length} kritiske kort uten full behandling.</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (currentPage === "oppgaver") {
+    const open = cards.filter(c => c.critical && !(c.type && c.linked && c.owner));
+    document.getElementById("content").innerHTML = `
+      <div class="k-card">
+        <h3>Åpne kritiske</h3>
+        ${open.length ? open.map(c => `<p style="margin:6px 0;">• ${c.title}</p>`).join("") : "<p>Ingen åpne.</p>"}
+      </div>
+    `;
+    return;
+  }
+
+  if (currentPage === "dokumentasjon") {
+    document.getElementById("content").innerHTML = `
+      <div class="k-card">
+        <h3>Dokumentasjon</h3>
+        <ul style="margin:10px 0 0 18px;color:var(--muted);">
+          <li>Build-logg</li>
+          <li>Spilltest</li>
+          <li>Publisher-referat</li>
+        </ul>
+      </div>
+    `;
+    return;
+  }
 
   const visible = filter
-    ? cards.filter(c => (c.title + c.content + c.source).toLowerCase().includes(filter.toLowerCase()))
+    ? cards.filter(c => (c.title + " " + c.content + " " + c.source).toLowerCase().includes(filter.toLowerCase()))
     : cards;
 
   document.getElementById("content").innerHTML = visible.map(c => `
@@ -193,13 +255,15 @@ function renderContent() {
         <button class="${c.type==='Fakta'?'selected':''}" onclick="setType(${c.id},'Fakta')">Fakta</button>
         <button class="${c.type==='Antakelse'?'selected':''}" onclick="setType(${c.id},'Antakelse')">Antakelse</button>
         <button class="${c.type==='Hull'?'selected':''}" onclick="setType(${c.id},'Hull')">Hull</button>
+        <button class="secondary ${c.linked?'selected':''}" onclick="toggle(${c.id},'linked')">Koble</button>
+        <button class="secondary ${c.owner?'selected':''}" onclick="toggle(${c.id},'owner')">Eier</button>
       </div>
     </div>
-  `).join("") || `<div class="card">Ingen treff på «${filter}»</div>`;
+  `).join("") || `<div class="k-card">Ingen treff på «${filter}»</div>`;
 }
 
 function renderEvents() {
-  document.getElementById("eventLog").innerHTML = events.map(e =>
+  document.getElementById("eventLog").innerHTML = events.slice(0, 20).map(e =>
     `<div class="event"><div class="time">${e.time}</div>${e.text}</div>`
   ).join("");
 }
@@ -208,11 +272,22 @@ function setType(id, type) {
   const c = cards.find(x => x.id === id);
   c.type = c.type === type ? null : type;
   events.unshift({ time: "nå", text: c.title + " → " + type });
+  saveState();
+  renderContent();
+  renderEvents();
+}
+
+function toggle(id, field) {
+  const c = cards.find(x => x.id === id);
+  c[field] = !c[field];
+  events.unshift({ time: "nå", text: c.title + " " + field + (c[field] ? " satt" : " fjernet") });
+  saveState();
   renderContent();
   renderEvents();
 }
 
 function selectPage(id) {
+  currentPage = id;
   document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
   event.target.classList.add("active");
   filter = "";
@@ -224,12 +299,12 @@ function handleAI() {
   const q = input.value.trim();
   if (!q) return;
 
-  const content = document.getElementById("content");
   const lower = q.toLowerCase();
 
   if (lower.startsWith("søk ") || lower.startsWith("finn ")) {
     filter = q.replace(/^(søk|finn)\s+/i, "");
     events.unshift({ time: "nå", text: "Søk: " + filter });
+    saveState();
     renderContent();
     renderEvents();
     input.value = "";
@@ -242,16 +317,22 @@ function handleAI() {
   if (lower.includes("status")) answer = `Status er ${s}. ${open.length} kritiske kort mangler full behandling.`;
   else if (lower.includes("android") || lower.includes("build")) answer = "Android-build er merket som Hull og er kritisk.";
   else if (lower.includes("eier") || lower.includes("hvem")) answer = "Åpne kritiske: " + (open.map(c => c.title).join(", ") || "ingen");
+  else if (lower.includes("hva") || lower.includes("nå")) answer = `Status ${s}. Åpne kritiske: ${open.length}.`;
   else answer = "Jeg kan hjelpe med status, kort og søk. Prøv «søk android» eller «status».";
 
-  content.insertAdjacentHTML("afterbegin", `<div class="ai-reply"><strong>NORMIA AI:</strong> ${answer}</div>`);
+  document.getElementById("content").insertAdjacentHTML("afterbegin", `<div class="ai-reply"><strong>NORMIA AI:</strong> ${answer}</div>`);
   events.unshift({ time: "nå", text: "NORMIA AI: " + q });
+  saveState();
   renderEvents();
   input.value = "";
 }
 
 renderContent();
 renderEvents();
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
 </script>
 </body>
 </html>
